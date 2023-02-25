@@ -5,9 +5,8 @@ import os
 if __name__ == "__main__":
     if sys.platform.startswith("darwin"):
         import program_files.GUI_files.GUI as GUI
-
-        #command to allow streamlit run
-        subprocess.call("streamlit run {}".format(os.path.dirname(__file__) + "/program_files/GUI_st/1_Main_Application.py"), shell=True)
+        
+        gui = GUI.GUI()
         
         
     elif sys.platform.startswith("linux"):
