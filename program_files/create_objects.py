@@ -1068,7 +1068,6 @@ class Sinks:
             ]
 
             if de["active"]:
-
                 # Create Sinks un-fixed time-series
                 if de["load profile"] == "x":
                     self.unfixed_sink(de)
@@ -1308,7 +1307,6 @@ class Transformers:
         # ground as a heat source referring to vertical-borehole
         # ground-coupled compression heat transformers
         if tf["heat source"] == "Ground":
-
             # borehole that acts as heat source for the transformer
             cmpr_heat_transformer_label = tf["label"] + temp + "_ground_source"
 
@@ -1320,7 +1318,6 @@ class Transformers:
             )
         # ground water as a heat source
         elif tf["heat source"] == "GroundWater":
-
             # ground water that acts as heat source for the transformer
             cmpr_heat_transformer_label = tf["label"] + temp + "_groundwater_source"
 
@@ -1329,7 +1326,6 @@ class Transformers:
 
         # ambient air as a heat source
         elif tf["heat source"] == "Air":
-
             # ambient air that acts as heat source for the transformer
             cmpr_heat_transformer_label = tf["label"] + temp + "_air_source"
 
@@ -1338,7 +1334,6 @@ class Transformers:
 
         # surface water as a heat source
         elif tf["heat source"] == "Water":
-
             # ambient air that acts as heat source for the transformer
             cmpr_heat_transformer_label = tf["label"] + temp + "_water_source"
 
@@ -1847,6 +1842,8 @@ class Storages:
                 },
                 loss_rate=s["capacity loss"],
                 initial_storage_level=s["initial capacity"],
+                min_storage_level=s["capacity min"],
+                max_storage_level=s["capacity max"],
                 inflow_conversion_factor=s["efficiency inflow"],
                 outflow_conversion_factor=s["efficiency outflow"],
                 invest_relation_input_capacity=s["input/capacity ratio"],
@@ -1953,12 +1950,11 @@ class Storages:
         # creates storage object for every storage element in nodes_data
         for i, s in nodes_data["storages"].iterrows():
             if s["active"]:
-
                 # Create Generic Storage
                 if s["storage type"] == "Generic":
                     self.generic_storage(s)
 
-                # Create Generic Storage
+                # Create Stratified Storage
                 if s["storage type"] == "Stratified":
                     self.stratified_thermal_storage(s, nodes_data["weather data"])
 
