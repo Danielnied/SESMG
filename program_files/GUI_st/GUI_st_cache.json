@@ -26,6 +26,8 @@
     "input_cluster_dh": false,
     "input_dh_folder_index": 0,
     "input_activate_dh_precalc": false,
+    "input_montecarlo_number_of_runs": "Not set",
+    "input_montecarlo_section": 1,
     "input_criterion_switch": false,
     "input_num_threads": 1,
     "input_solver": "cbc",
