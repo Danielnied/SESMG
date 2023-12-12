@@ -196,14 +196,26 @@ class Sinks:
                     self.insulation.loc[num, "ep_costs_kW"] = 0
                     # add capacity specific emissions to self.insulation
                     self.insulation.loc[num, "ep_constr_costs_kW"] = 0
+                    minimum = 0
                     maximum = 0
                     existing = max(temp)
+                elif "existing with costs" in self.insulation \
+                        and ins["existing with costs"]:
+                    # add capacity specific costs to self.insulation
+                    self.insulation.loc[num, "ep_costs_kW"] = ep_costs
+                    # add capacity specific emissions to self.insulation
+                    self.insulation.loc[num, "ep_constr_costs_kW"] = \
+                        ep_constr_costs
+                    minimum = max(temp)
+                    maximum = max(temp)
+                    existing = 0
                 else:
                     # add capacity specific costs to self.insulation
                     self.insulation.loc[num, "ep_costs_kW"] = ep_costs
                     # add capacity specific emissions to self.insulation
                     self.insulation.loc[num, "ep_constr_costs_kW"] = \
                         ep_constr_costs
+                    minimum = 0
                     maximum = max(temp)
                     existing = 0
                     
@@ -217,7 +229,7 @@ class Sinks:
                                     periodical_constraint_costs=
                                     ep_constr_costs,
                                     constraint2=1,
-                                    minimum=0,
+                                    minimum=minimum,
                                     maximum=maximum,
                                     fix_constraint_costs=0,
                                     existing=existing
