@@ -509,7 +509,7 @@ elif os.path.join(st.session_state["state_result_path"], "components.csv") \
         result_path_graph=st.session_state["state_pareto_result_path"]
         + "/graph.gv.png")
 
-elif os.path.join(st.session_state["state_result_path"], "guude.csv") \
+elif os.path.join(st.session_state["state_result_path"], "montecarlo.csv") \
         in glob.glob(st.session_state["state_result_path"] + "/*"):
     
     show_montecarlo(
