@@ -264,165 +264,43 @@ class Results:
         logging.info("   " + "Successfully prepared results...")
 
 
-class Results_montecarlo:
+def montecarlo_results(montecarlo_dict: dict) -> None:
     """
-        Returns a list of all defined components with the following
-        information:
-
-        +------------+----------------------------------------------+
-        |component   |   information                                |
-        +------------+----------------------------------------------+
-        |sinks       |   Total Energy Demand                        |
-        +------------+----------------------------------------------+
-        |sources     |   Total Energy Input, Max. Capacity,         |
-        |            |   Variable Costs, Periodical Costs           |
-        +------------+----------------------------------------------+
-        |transformers|   Total Energy Output, Max. Capacity,        |
-        |            |   Variable Costs, Investment Capacity,       |
-        |            |   Periodical Costs                           |
-        +------------+----------------------------------------------+
-        |storages    |   Energy Output, Energy Input, Max. Capacity,|
-        |            |   Total variable costs, Investment Capacity, |
-        |            |   Periodical Costs                           |
-        +------------+----------------------------------------------+
-        |links       |   Total Energy Output                        |
-        +------------+----------------------------------------------+
-
-        Furthermore, a list of recommended investments is printed.
-
-        The algorithm uses the following steps:
-
-            1. logging the component type for example "sinks"
-            2. creating pandas dataframe out of the results of the
-               optimization consisting of every single flow in/out
-               a component
-            3. calculating the investment and the costs regarding
-               the flows
-            4. adding the component to the list of components (loc)
-               which is part of the plotly dash and is the content
-               of components.csv
-
-        :param nodes_data: dictionary containing data from excel \
-            model definition file
-        :type nodes_data: dict
-        :param optimization_model: optimized energy system
-        :type optimization_model: oemof.solph.Model
-        :param energy_system: original (unoptimized) energy system
-        :type energy_system: oemof.solph.Energysystem
-        :param result_path: Path where the results are saved.
-        :type result_path: str
-        :param console_log: boolean which decides rather the results \
-            will be logged in the console or not
-        :type console_log: bool
-        :param cluster_dh: boolean which decides rather the thermal \
-            network was spatially clustered or not
-        :type cluster_dh: bool
+        Function to create the results of a succeeded 
+        Monte Carlo simulation and to gather all results.
+        
+        [...]
     """
+    
+    # import total costs and emissions of current run
+    df_summary = pd.read_csv(montecarlo_dict["sub_directory"] + "/summary.csv")
+    
+    montecarlo_dict["costs"].append(df_summary.iloc[0, 3])
+    montecarlo_dict["emissions"].append(df_summary.iloc[0, 4])
 
-    results = None
-    esys = None
-    comp_capacity = None
-    df_list_of_components = None
-    df_result_table = None
-
-    def __init__(
-        self,
-        nodes_data: dict,
-        optimization_model: solph.Model,
-        energy_system: solph.EnergySystem,
-        result_path: str,
-        console_log: bool,
-        cluster_dh: bool,
-        x:list,
-        y:list,
-    ):
-        """
-            Inits the Results class.
-        """
-
-        # remove all old entries from method intern variables
-        investments_to_be_made = {}
-        # define class variables
-        self.esys = energy_system
-        self.results = solph.processing.results(optimization_model)
-
-        # collect the energy system results which have to be extracted
-        # from the component specific result object
-        comp_dict, total_demand, total_usage = collect_data(
-            nodes_data=nodes_data,
-            results=self.results,
-            esys=self.esys,
-            result_path=result_path
-        )
-
-        (
-            loc,
-            total_periodical_costs,
-            total_variable_costs,
-            total_constraint_costs,
-            df_result_table,
-            total_demand,
-        ) = prepare_data(comp_dict=comp_dict,
-                         total_demand=total_demand,
-                         nodes_data=nodes_data)
+    # create and export results as csv 
+    df_costs_and_emissions = pd.DataFrame({"Costs": montecarlo_dict["costs"], 
+                                           "Emissions": montecarlo_dict["emissions"], 
+                                           "Folder": montecarlo_dict["folder"]}, 
+                                            columns=["Costs", "Emissions", "Folder"])
+    df_costs_and_emissions.to_csv(montecarlo_dict["main_directory"] + "/montecarlo.csv", 
+                                  index=False)
+    
+    # print number of current run as a status information
+    logging.info("   " + "Current run: " + str(len(montecarlo_dict["costs"])))
+    
+    
+def montecarlo_failed_runs(montecarlo_dict: dict) -> None:
+    """
+        Function to create and export a list of failed 
+        Monte Carlo simulation runs.
         
-        # SUMMARY
-        meta_results = solph.processing.meta_results(optimization_model)
-        meta_results_objective = meta_results["objective"]
-
-        # Importing time system parameters from the model definition
-        ts = next(nodes_data["energysystem"].iterrows())[1]
-        temp_resolution = ts["temporal resolution"]
-        start_date = ts["start date"]
-        end_date = ts["end date"]
-
-        df_summary = pd.DataFrame(
-            [
-                [
-                    start_date,
-                    end_date,
-                    temp_resolution,
-                    round(meta_results_objective, 2),
-                    round(total_constraint_costs, 2),
-                    round(total_variable_costs, 2),
-                    round(total_periodical_costs, 2),
-                    round(total_demand, 2),
-                    round(total_usage, 2),
-                ]
-            ],
-            columns=[
-                "Start Date",
-                "End Date",
-                "Resolution",
-                "Total System Costs",
-                "Total Constraint Costs",
-                "Total Variable Costs",
-                "Total Periodical Costs",
-                "Total Energy Demand",
-                "Total Energy Usage",
-            ],
-        )
-
-        # Dataframes are exported as csv for further processing
-        loc.to_csv(result_path + "/components.csv", index=False)
-
-        df_result_table = df_result_table.rename_axis("date")
-        df_result_table.to_csv(result_path + "/results.csv")
-
-        df_summary.to_csv(result_path + "/summary.csv", index=False)
-        
-        ## Eigene Anpassung Anfang
-        
-        
-        x.append(df_summary.iloc[0, 3])
-        #df_kosten = pd.DataFrame(x)
-        #df_kosten.to_csv(result_path + "/guude.csv", index=False)
-        y.append(df_summary.iloc[0,4])
-        df_kostenundemissionen=pd.DataFrame({"Kosten": x, "Emissionen": y})
-        df_kostenundemissionen.to_csv(result_path + "/montecarlo.csv", index=False)
-
-        
-        
-        ## Eigene Anpassung Ende, in die logging info schreibt er am Ende noch die Länge der Kostenliste rein
-
-        logging.info("   " + "Successfully prepared results. Current run: " + str(len(x)))
+        [...]
+    """
+    
+    # create a DataFrame of the folder numbers belonging to
+    # failed monte carlo runs and export as csv
+    df_failed_runs = pd.DataFrame(montecarlo_dict["folder_failed"], 
+                                 columns=["Folder Failed"])
+    df_failed_runs.to_csv(montecarlo_dict["main_directory"] + "/montecarlo_failed_runs.csv", index=False)
+    
