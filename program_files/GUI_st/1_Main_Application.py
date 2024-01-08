@@ -422,13 +422,14 @@ def main_input_sidebar() -> st.runtime.uploaded_file_manager.UploadedFile:
                 else:
                     GUI_main_dict["input_dh_folder"] = ""
 
-            # Input for monte carlo simulation
+            # Selection of parameters to carry out 
+            # a Monte Carlo Simulation            
             with st.expander("Monte Carlo Simulation"):
             
                 input_montecarlo_number_of_runs = st.selectbox(
                     label="Number of iterations",
                     options=["Not set"] + list(range(10, 510, 10)),
-                    index=GUI_functions.index_montecarlo(mc_input=settings_cache_dict_reload[
+                    index=index_montecarlo(mc_input=settings_cache_dict_reload[
                         "input_montecarlo_number_of_runs"]),
                     help=GUI_helper["montecarlo_number_of_iterations"])
                 input_montecarlo_section = st.slider(
@@ -441,6 +442,14 @@ def main_input_sidebar() -> st.runtime.uploaded_file_manager.UploadedFile:
                 
                 GUI_main_dict["input_montecarlo_number_of_runs"] = input_montecarlo_number_of_runs
                 GUI_main_dict["input_montecarlo_section"] = input_montecarlo_section
+                
+                
+                # set if a pareto run should be performed additionally
+                GUI_main_dict["montecarlo_with_pareto"] = \
+                    st.checkbox(
+                        label="Perform pareto run in advance",
+                        value=settings_cache_dict_reload["montecarlo_with_pareto"],
+                        help=GUI_helper["montecarlo_with_pareto"])
 
             # create criterion switch
             GUI_main_dict["input_criterion_switch"] = \
@@ -654,37 +663,78 @@ if st.session_state["state_submitted_optimization"] == "done":
         # Starting the model run
         if len(GUI_main_dict["input_pareto_points"]) == 0:
 
-            # function to create the result pasths and store session state
-            create_result_paths()
-
+             # starts monte carlo run if a number of runs is set,
+            # starts model run if not
             if GUI_main_dict["input_montecarlo_number_of_runs"] != "Not set":
-
-                with st.spinner("Modeling in Progress..."):
+      
+                # starts additional pareto run in advance if selected 
+                if GUI_main_dict["montecarlo_with_pareto"]:
                     
-                    # start monte carlo run
-                    GUI_functions.run_SESMG_montecarlo(GUI_main_dict=GUI_main_dict,
+                    with st.spinner("Modeling in Progress..."):
+                    
+                        # run pareto in advance and 
+                        # return res path
+                        GUI_main_dict["res_path"] = \
+                            run_pareto(
+                                limits=[0.1, 0.5, 0.95, 0.98, 0.99],
+                                model_definition=model_definition_input_file,
+                                GUI_main_dict=GUI_main_dict)
+                        
+                        # run monte carlo loops and return res path
+                        GUI_main_dict["res_path"] = run_SESMG_montecarlo(GUI_main_dict=GUI_main_dict,
+                                  model_definition=model_definition_input_file)
+                        
+
+                        # safe path as session state for the result processing page
+                        st.session_state["state_result_path"] = \
+                            GUI_main_dict["res_path"]
+
+                        # save GUI settings in result folder and reset session state
+                        save_run_settings()
+
+                    # switch page after the model run completed
+                    nav_page(page_name="Result_Processing", timeout_secs=3)
+                
+                else:
+            
+                    with st.spinner("Modeling in Progress..."):
+
+                        
+
+                        # run monte carlo loops and return res path
+                        GUI_main_dict["res_path"]=run_SESMG_montecarlo(GUI_main_dict=GUI_main_dict,
+                                  model_definition=model_definition_input_file)
+                                  
+
+                        # safe path as session state for the result processing page
+                        st.session_state["state_result_path"] = \
+                        GUI_main_dict["res_path"]
+
+
+                        # save GUI settings in result folder and reset session state
+                        save_run_settings()
+
+                    # switch page after the model run completed
+                    nav_page(page_name="Result_Processing", timeout_secs=3)
+                
+                
+            else:
+                
+                
+                # function to create the result pasths and store session state
+                create_result_paths()
+                
+                with st.spinner("Modeling in Progress..."):
+
+                    
+                    run_SESMG(GUI_main_dict=GUI_main_dict,
                               model_definition=model_definition_input_file,
                               save_path=GUI_main_dict["res_path"])
-                     
+
+
                     # save GUI settings in result folder and reset session state
                     save_run_settings()
 
-                # switch page after the model run completed
-                nav_page(page_name="Result_Processing", timeout_secs=3)
-
-            else:
-
-                with st.spinner("Modeling in Progress..."):
-    
-                    # start model run
-                    GUI_functions.run_SESMG(
-                        GUI_main_dict=GUI_main_dict,
-                        model_definition=model_definition_input_file,
-                        save_path=GUI_main_dict["res_path"])
-    
-                    # save GUI settings in result folder and reset session state
-                    save_run_settings()
-    
                 # switch page after the model run completed
                 nav_page(page_name="Result_Processing", timeout_secs=3)
 
