@@ -287,66 +287,32 @@ def sesmg_main_including_premodel(
 def sesmg_main_montecarlo(model_definition_file: str, result_path: str, num_threads: int,
                criterion_switch: bool, xlsx_results: bool,
                console_results: bool, timeseries_prep: list, solver: str,
-               x:list, y:list, i:int, montecarlo_section_runs:int, montecarlo_section:int,
+               montecarlo_dict: dict, montecarlo_section_runs: int, montecarlo_section: int,
                cluster_dh, graph=False, district_heating_path=None) -> None:
     """
-        Main function of the Spreadsheet System Model Generator
+        Main function to run the Monte Carlo Simulation.
 
-        :param model_definition_file: The model definition file must \
-            contain the components specified above.
-        :type model_definition_file: str ['xlsx']
-        :param result_path: path of the folder where the results will \
-            be saved
-        :type result_path: str ['folder']
-        :param num_threads: number of threads that the method may use
-        :type num_threads: int
-        :param criterion_switch: boolean which decides rather the \
-            first and second optimization criterion will be switched \
-            (True) or not (False)
-        :type criterion_switch: bool
-        :param xlsx_results: boolean which decides rather a flow \
-            Spreadsheet will be created for each bus of the energy \
-            system after the optimization (True) or not (False)
-        :type xlsx_results: bool
-        :param console_results: boolean which decides rather the \
-            energy system's results will be printed in the console \
-            (True) or not (False)
-        :type console_results: bool
-        :param timeseries_prep: list containing the attributes \
-            necessary for timeseries simplifications
-        :type timeseries_prep: list
-        :param solver: str holding the user chosen solver
-        :type solver: str
-        :param cluster_dh: boolean which decides rather the district \
-            heating components are clustered street wise (True) or not \
-            (False)
-        :type cluster_dh: bool
-        :param graph: defines if the graph should be created
-        :type graph: bool
-        :param district_heating_path: path to the folder where already \
-            calculated district heating data is stored
-        :type district_heating_path: str['folder']
+        [...]
     """
+    
     # sets number of threads for numpy
     os.environ['NUMEXPR_NUM_THREADS'] = str(num_threads)
     # defines a logging file
     logger.define_logging(logpath=result_path)
     
-    
-    # imports data from the excel file and returns it as a dictionary
-    #if i<5:
-    
+    # imports the excel sheets, inserts random numbers and saves
+    # the modified model definition
     nodes_data = create_energy_system.import_model_definition_montecarlo(
-        durchlauf=i, montecarlo_section_runs=montecarlo_section_runs,
+        current_run=montecarlo_dict["current_run"], montecarlo_section_runs=montecarlo_section_runs,
         montecarlo_section=montecarlo_section,
-        filepath=model_definition_file)
-    #else:
-    #    i+=1
-    #    continue
+        filepath=model_definition_file, result_path=result_path)
     
+    # skips runs according
+    # to selected section
     if nodes_data=={}:
         return None
-
+    
+    
     # if the user has chosen two switch the optimization criteria the
     # nodes data dict is adapted
     if criterion_switch:
@@ -433,10 +399,10 @@ def sesmg_main_montecarlo(model_definition_file: str, result_path: str, num_thre
                             filepath=result_path)
 
     # creates the data used for the results presentation in the GUI
-    create_results.Results_montecarlo(
+    create_results.Results(
         nodes_data=nodes_data, optimization_model=om, energy_system=esys,
         result_path=result_path, console_log=console_results,
-        cluster_dh=cluster_dh, x=x, y=y)
+        cluster_dh=cluster_dh)
 
     logging.info('\t ' + 56 * '-')
     logging.info('\t Modelling and optimization successfully completed!') 
