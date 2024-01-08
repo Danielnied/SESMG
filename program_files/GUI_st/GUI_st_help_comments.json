@@ -41,7 +41,8 @@
     
     "montecarlo_error_definition": "Pareto optimization and Monte Carlo simulations are not supposed to run at the same time. Please select only one of them.",
     "montecarlo_number_of_iterations": "Sets number of total monte carlo draws that will be performed consecutively.",
-    "montecarlo_section": "Skips number of runs up to the selected section index. I. e. if 100 iterations and section number 3 are set, the first 200 runs will be skipped and 100 runs (from 201 to 300) will be executed."
+    "montecarlo_section": "Skips number of runs up to the selected section index. I. e. if 100 iterations and section number 3 are set, the first 200 runs will be skipped and 100 runs (from 201 to 300) will be executed.",
+    "montecarlo_with_pareto": "If selected, a set of pareto runs will be carried out and its corresponding curve will be plotted additionally."
 }
 
 
