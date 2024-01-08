@@ -11,7 +11,10 @@ from pathlib import Path
 from PIL import Image
 import streamlit as st
 import random
-
+from datetime import datetime
+from program_files.preprocessing.pareto_optimization import create_model_definition_save_folder
+from program_files.postprocessing import create_results
+import logging
 from program_files.preprocessing.Spreadsheet_Energy_System_Model_Generator \
     import sesmg_main, sesmg_main_including_premodel, sesmg_main_montecarlo
 
@@ -255,8 +258,8 @@ def run_SESMG(GUI_main_dict: dict,
 
 
 def run_SESMG_montecarlo(GUI_main_dict: dict,
-              model_definition: str,
-              save_path: str) -> None:
+              model_definition: str
+              ) -> str:
     """
         Function to run a Monte Carlo simulation via SESMG main based on 
         the GUI input values dict.
@@ -269,16 +272,54 @@ def run_SESMG_montecarlo(GUI_main_dict: dict,
         :param save_path: file path where the results will be saved
         :type save_path: str
     """
-    x=[]
-    y=[]
-    i = 0 
-    total_runs_montecarlo = GUI_main_dict["input_montecarlo_number_of_runs"]*10
+
+    
+    # creating a dictionary to store the 
+    # relevant parameters during the monte carlo runs
+    montecarlo_dict = {"costs": [], 
+                       "emissions": [], 
+                       "folder": [], 
+                       "current_run": 0, 
+                       "folder_number": 1, 
+                       "main_directory": "",
+                       "sub_directory": "",
+                       "folder_failed": []
+                      }
+        
+        
+    # sets the corresponding directory and the initial result folder number depending on
+    # whether a pareto run was performed in advance or not
+    if GUI_main_dict["montecarlo_with_pareto"]:
+        
+        directory = GUI_main_dict["res_path"]
+        montecarlo_dict["folder_number"] = 2
+        
+        
+    else:
+        directory = os.path.join(
+                        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                        "results/" + datetime.now().strftime("%Y-%m-%d--%H-%M-%S"),
+                )
+        os.mkdir(directory)
+        
+    montecarlo_dict["main_directory"] = directory
+
+    
+    # set up the parameters for the following loop
+    montecarlo_section_runs = GUI_main_dict["input_montecarlo_number_of_runs"]
+    montecarlo_section = GUI_main_dict["input_montecarlo_section"]
+    total_runs_montecarlo = montecarlo_section_runs*10
+    
+    # selecting a seed in order to
+    # guarantee reproducibility of section runs
     random.seed(1)
     
-    while i < total_runs_montecarlo:
+    # initialize the monte carlo loop
+    while montecarlo_dict["current_run"] < total_runs_montecarlo:
+        
         
         try:
-    
+
             # prepare timeseries parameter list
             timeseries_prep_parameter_list = \
                 ["input_timeseries_algorithm", "input_timeseries_cluster_index",
@@ -291,7 +332,23 @@ def run_SESMG_montecarlo(GUI_main_dict: dict,
                 input_timeseries_season="input_timeseries_season")
 
             if not GUI_main_dict["input_activate_premodeling"]:
+                
+                
+                
+                # create separate folders to collect all runs
+                if montecarlo_dict["current_run"] >= montecarlo_section_runs * (montecarlo_section -1) and \
+                montecarlo_dict["current_run"] < montecarlo_section_runs * montecarlo_section:
+                      
+                    save_path = create_model_definition_save_folder(model_definition,
+                                                                directory, str(montecarlo_dict["folder_number"]))
+                    montecarlo_dict["sub_directory"] = save_path
+                    montecarlo_dict["folder_number"] +=1
+                    
+                else:
 
+                    save_path = directory
+           
+                # run current monte carlo sample
                 sesmg_main_montecarlo(
                     model_definition_file=model_definition,
                     result_path=save_path,
@@ -303,21 +360,49 @@ def run_SESMG_montecarlo(GUI_main_dict: dict,
                     solver=GUI_main_dict["input_solver"],
                     district_heating_path=GUI_main_dict["input_dh_folder"],
                     cluster_dh=GUI_main_dict["input_cluster_dh"],
-                    x=x, y=y, i=i, montecarlo_section_runs=GUI_main_dict["input_montecarlo_number_of_runs"],
-                    montecarlo_section=GUI_main_dict["input_montecarlo_section"])
+                    montecarlo_dict=montecarlo_dict, montecarlo_section_runs=montecarlo_section_runs,
+                    montecarlo_section=montecarlo_section)
+            
+                # save folder number of successfull runs
+                if montecarlo_dict["current_run"] >= montecarlo_section_runs * (montecarlo_section -1) and \
+                montecarlo_dict["current_run"] < montecarlo_section_runs * montecarlo_section:
+                    
+                    montecarlo_dict["folder"].append(montecarlo_dict["folder_number"] -1)
+            
+                # raise number of current run
+                montecarlo_dict["current_run"] +=1
                 
-                i+=1
+                # append results of current run 
+                create_results.montecarlo_results(montecarlo_dict)
+                
+                
 
-            # If pre-modeling is activated a second run will be carried out
+            # If pre-modeling is activated an error message will occur
             else:
-                print("Pre-modeling with monte carlo currently not supported.")
+                
+                logging.info("   " + "Pre-modeling with monte carlo currently not supported.")
                 break
 
-            
+        # if a run doesn't succeed its number will be saved
         except:
-            continue
             
-    print("Fertig gelaufen")
+            if montecarlo_dict["current_run"] >= montecarlo_section_runs * (montecarlo_section -1) and \
+                montecarlo_dict["current_run"] < montecarlo_section_runs * montecarlo_section:
+                
+                    montecarlo_dict["folder_failed"].append(montecarlo_dict["folder_number"] -1)
+                    
+            create_results.montecarlo_failed_runs(montecarlo_dict)
+            continue
+    
+    
+    # create a final csv of failed runs  
+    create_results.montecarlo_failed_runs(montecarlo_dict)
+    
+    
+    logging.info("   " + "Monte Carlo runs successfully completed.")
+    
+
+    return directory
 
 
 def read_markdown_document(document_path: str, folder_path: str,
