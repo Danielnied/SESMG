@@ -10,6 +10,7 @@ import pandas as pd
 from st_aggrid import AgGrid, GridUpdateMode
 import plotly.express as px
 from PIL import Image
+import plotly.graph_objects as go
 
 from program_files.GUI_st.GUI_st_global_functions import \
     import_GUI_input_values_json, st_settings_global, read_markdown_document, \
@@ -53,7 +54,12 @@ def result_processing_sidebar() -> None:
                 os.path.join(set_result_path(),
                              existing_result_folder)
 
+        # open results of pareto run if neither montecarlo
+        # nor a single run were performed
         if st.session_state["state_result_path"] != "not set" and \
+                os.path.join(st.session_state["state_result_path"],
+                             "montecarlo.csv") \
+                not in glob.glob(st.session_state["state_result_path"] + "/*") and \
                 os.path.join(st.session_state["state_result_path"],
                              "components.csv") \
                 not in glob.glob(st.session_state["state_result_path"] + "/*"):
@@ -354,20 +360,67 @@ def show_montecarlo(result_path_montecarlo: str) -> None:
     # Header
     st.subheader("Monte Carlo Diagram")
 
-    # load pareto.csv
+    # load montecarlo.csv
     montecarlo_df = pd.read_csv(result_path_montecarlo)
+    
     # create and show montecarlo plot
-    #px.scatter(a, x= "Kosten", y = "Emissionen")
     fig = px.scatter(montecarlo_df,
-                  x="Kosten",
-                  y="Emissionen",
+                  x="Costs",
+                  y="Emissions",
                   #markers=True,
-                  #hover_data=["costs", "emissions"],
-                  labels={"Kosten": "costs (EUR / a)",
-                          "Emissionen": "emissions (g CO<sub>2</sub> / a)"}
+                  hover_data=["Costs", "Emissions", "Folder"],
+                  labels={"Costs": "costs (EUR / a)",
+                          "Emissions": "emissions (g CO<sub>2</sub> / a)"}
                   )
     fig.update_traces(textposition="top right")
     st.plotly_chart(fig, theme="streamlit", use_container_width=True)
+    
+    
+def show_montecarlo_with_pareto(result_path_montecarlo: str, result_path_pareto: str) -> None:
+    """
+        Function to depict the results of the monte carlo
+        runs using a scatter plot in combination with a pareto set
+        as a matter of orientation.
+
+        :param result_path_montecarlo: path to a result \
+            montecarlo.csv file
+        :type result_path_montecarlo: str
+    """
+    # Header
+    st.subheader("Monte Carlo Diagram")
+
+    # load montecarlo.csv
+    montecarlo_df = pd.read_csv(result_path_montecarlo)
+    
+    # create montecarlo plot
+    fig_montecarlo = px.scatter(montecarlo_df,
+                  x="Costs",
+                  y="Emissions",
+                  #markers=True,
+                  hover_data=["Costs", "Emissions", "Folder"],
+                  labels={"Costs": "costs (EUR / a)",
+                          "Emissions": "emissions (g CO<sub>2</sub> / a)"}
+                  )
+    
+    # load pareto.csv
+    pareto_df = pd.read_csv(result_path_pareto)
+    # create pareto plot incl. point values
+    fig_pareto = px.line(pareto_df,
+                  x="costs",
+                  y="emissions",
+                  markers=True,
+                  hover_data=["costs", "emissions"],
+                  labels={"costs": "costs (EUR / a)",
+                          "emissions": "emissions (g CO<sub>2</sub> / a)"}
+                  )
+    
+    # color pareto in green and plot both montecarlo and pareto plots
+    fig_pareto.update_traces(line_color="#00ff00")
+    fig = go.Figure(data = fig_montecarlo.data + fig_pareto.data)
+    fig.update_xaxes(title="costs (EUR / a)")
+    fig.update_yaxes(title="emissions (g CO<sub>2</sub> / a)")
+    fig.update_traces(textposition="top right")
+    st.plotly_chart(fig, theme="streamlit", use_container_width=True) 
 
 
 def short_result_graph(result_path_graph: str) -> None:
@@ -408,10 +461,8 @@ if st.session_state["state_result_path"] == "not set":
 # check if components.csv is in the result folder. Loading result page \
 # elements for a non-pareto run if so.
 elif os.path.join(st.session_state["state_result_path"], "components.csv") \
-        in glob.glob(st.session_state["state_result_path"] + "/*") \
-        and \
-        os.path.join(st.session_state["state_result_path"], "montecarlo.csv") \
-        not in glob.glob(st.session_state["state_result_path"] + "/*"):
+        in glob.glob(st.session_state["state_result_path"] + "/*"):
+            
     # show short result summaries time series information
     short_result_summary_time(
         result_path_summary=st.session_state["state_result_path"]
@@ -455,6 +506,8 @@ elif os.path.join(st.session_state["state_result_path"], "components.csv") \
 # check if components.csv is in the result folder. Loading result page \
 # elements for a pareto run if not.
 elif os.path.join(st.session_state["state_result_path"], "components.csv") \
+        not in glob.glob(st.session_state["state_result_path"] + "/*") and \
+        os.path.join(st.session_state["state_result_path"], "montecarlo.csv") \
         not in glob.glob(st.session_state["state_result_path"] + "/*"):
     # show building specific results
     show_pareto(
@@ -509,7 +562,19 @@ elif os.path.join(st.session_state["state_result_path"], "components.csv") \
         result_path_graph=st.session_state["state_pareto_result_path"]
         + "/graph.gv.png")
 
-elif os.path.join(st.session_state["state_result_path"], "montecarlo.csv") \
+elif os.path.join(st.session_state["state_result_path"], "pareto.csv") \
+        in glob.glob(st.session_state["state_result_path"] + "/*") and \
+     os.path.join(st.session_state["state_result_path"], "montecarlo.csv") \
+        in glob.glob(st.session_state["state_result_path"] + "/*"):
+    show_montecarlo_with_pareto(
+        result_path_montecarlo=os.path.join(st.session_state["state_result_path"],
+                                        "montecarlo.csv"), 
+        result_path_pareto=os.path.join(st.session_state["state_result_path"],
+                                        "pareto.csv"))
+    
+elif os.path.join(st.session_state["state_result_path"], "pareto.csv") \
+        not in glob.glob(st.session_state["state_result_path"] + "/*") and \
+     os.path.join(st.session_state["state_result_path"], "montecarlo.csv") \
         in glob.glob(st.session_state["state_result_path"] + "/*"):
     
     show_montecarlo(
