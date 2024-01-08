@@ -28,6 +28,7 @@
     "input_activate_dh_precalc": false,
     "input_montecarlo_number_of_runs": "Not set",
     "input_montecarlo_section": 1,
+    "montecarlo_with_pareto": false,
     "input_criterion_switch": false,
     "input_num_threads": 1,
     "input_solver": "cbc",
