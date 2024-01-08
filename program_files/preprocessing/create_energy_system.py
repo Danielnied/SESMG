@@ -9,7 +9,7 @@ import logging
 from program_files.preprocessing.import_weather_data \
     import import_open_fred_weather_data
 from oemof.solph import EnergySystem
-import random as rand
+import random
 pandas.options.mode.chained_assignment = None
 
 
@@ -86,11 +86,14 @@ def import_model_definition(filepath: str, delete_units=True) -> dict:
     return nodes_data
 
 
-def import_model_definition_montecarlo(durchlauf: int, montecarlo_section_runs: int,
+def import_model_definition_montecarlo(current_run: int, montecarlo_section_runs: int,
                             montecarlo_section: int,
-                            filepath: str, delete_units=True) -> dict:
+                            filepath: str, result_path:str, delete_units=True) -> dict:
     """
-        Imports data from a spreadsheet model definition file.
+        Imports data from a spreadsheet model definition file and
+        variates parameters. Returns the data needed to start a
+        simulation if the selected section is carried out, returns
+        None to skip the rest of runs if not.
     
         The excel sheet has to contain the following sheets:
     
@@ -107,7 +110,9 @@ def import_model_definition_montecarlo(durchlauf: int, montecarlo_section_runs: 
             - insulation
             - district heating
             - pipe types
-    
+        
+        [...]
+        
         :param filepath: path to excel model definition file
         :type filepath: str
         :param delete_units: boolean which defines rather the unit \
@@ -120,59 +125,114 @@ def import_model_definition_montecarlo(durchlauf: int, montecarlo_section_runs: 
     """
     # creates nodes from excel sheet
     try:
-        xls = pandas.ExcelFile(filepath)  
+        xls = pandas.ExcelFile(filepath)
+           
     except FileNotFoundError:
         raise FileNotFoundError("Problem importing model definition file.")
-        
-    if durchlauf>=montecarlo_section_runs*(montecarlo_section-1) and durchlauf<montecarlo_section_runs*montecarlo_section:
-        
-        ## Eigene Bearbeitung Start
+   
+    # varies buses, if no building is connected to the 
+    # district heating, the grid will be deactivated
+    buses_varied = xls.parse("buses")
+    
+    connected_buildings = 0
+    for i, index in buses_varied["district heating conn."][1:].items():
+        if buses_varied["sector"][i] == "heat":
+            index = random.randint(0,1)
+            buses_varied["district heating conn."][i] = index
+            connected_buildings += index
+            logging.info("House connection: " + str(buses_varied["district heating conn."][i]))
 
-        # Ändern der Kapazitäten durch Zufallszahlen, kommt bei "sources" rein, im aktuellen Zustand nicht zur Variation gesetzt
+    for i, index in buses_varied["district heating conn."][1:].items():
+        if buses_varied["sector"][i] == "central_heat":
+            if connected_buildings != 0:
+                buses_varied["district heating conn."][i] = "dh-system"
+            else:
+                buses_varied["district heating conn."][i] = 0
+            logging.info("District heating connection: " +str(buses_varied["district heating conn."][i]))
 
-        a = xls.parse("sources")
-        a_2 = xls.parse("sources")
-        
+    # varies sources
+    sources_varied = xls.parse("sources")
+    sources = xls.parse("sources")
+    
+    for i, index in sources_varied["min. investment capacity"][1:].items():
+        index = random.randint(0 , sources["max. investment capacity"][i])
+        sources_varied["min. investment capacity"][i] = index
+        sources_varied["max. investment capacity"][i] = sources_varied["min. investment capacity"][i]
+        logging.info("Sources: " + str(index))
 
-        # Änderung des Heizungssystems auf Zufallsbasis von der Wahl der Komponente als auch der Kapazität, bei "transformers"
+    
+    # varies transformers
+    transformers_varied = xls.parse("transformers")
+    transformers = xls.parse("transformers")
+    for i, index in transformers_varied["min. investment capacity"][1:].items():
+        index = random.randint(0 , transformers["max. investment capacity"][i])
+        transformers_varied["min. investment capacity"][i] = index
+        transformers_varied["max. investment capacity"][i] = transformers_varied["min. investment capacity"][i]
+        logging.info("Transformers: " + str(index))
 
-        b = xls.parse("transformers")
-        b_2 = xls.parse("transformers")
-        for i, index in b["min. investment capacity"][1:].items():
-            index=rand.randint(0,b_2["max. investment capacity"][i])
-            b["min. investment capacity"][i]=index
-            b["max. investment capacity"][i]=b["min. investment capacity"][i]
-            logging.info("Transformers: " + str(index))
-       
+    # varies storages
+    storages_varied = xls.parse("storages")
+    storages = xls.parse("storages")
+    for i, index in storages_varied["min. investment capacity"][1:].items():
+        index = random.randint(0 , storages["max. investment capacity"][i])
+        storages_varied["min. investment capacity"][i] = index
+        storages_varied["max. investment capacity"][i] = storages_varied["min. investment capacity"][i]
+        logging.info("Storages: " + str(index))
 
+    # varies links
+    links_varied = xls.parse("links")
+    links = xls.parse("links")
+    for i, index in links_varied["min. investment capacity"][1:].items():
+        index = random.randint(0 , links_varied["max. investment capacity"][i])
+        links_varied["min. investment capacity"][i] = index
+        links_varied["max. investment capacity"][i] = links_varied["min. investment capacity"][i]
+        logging.info("Links: " + str(index))
 
-        # Zufällige Auswahl von Speichersystemen, thermisch und/oder elektrisch
+    # varies insulation and its area   
+    insulation_varied = xls.parse("insulation")
+    insulation = xls.parse("insulation")
+    
+    for i, index in insulation_varied["existing with costs"][1:].items():
+        index = random.randint(0,1)
+        insulation_varied["existing with costs"][i] = index
+        logging.info("Insulation: " + str(index))
+    for i, index in insulation_varied["area"][1:].items():
+        index = random.uniform(0 , insulation["area"][i])
+        insulation_varied["area"][i] = index
+        logging.info("Insulation area: " + str(index))
 
-        c = xls.parse("storages")
-        c_2 = xls.parse("storages")
-        for i, index in c["min. investment capacity"][1:].items():
-            index=rand.randint(0,c_2["max. investment capacity"][i])
-            c["min. investment capacity"][i]=index
-            c["max. investment capacity"][i]=c["min. investment capacity"][i]
-            logging.info("... und Speicher: " + str(index))
-
-        
-
+    # activates district heating if
+    # at least one house connection is available
+    district_heating = xls.parse("district heating")
+    
+    for i, index in district_heating["active"][1:].items():
+        if connected_buildings != 0:
+            district_heating["active"][i] = 1
+        else:
+            district_heating["active"][i] = 0   
+        logging.info("District heating: " + str(district_heating["active"][i]))
+    
+    
+    # read and return varied data if current run is in the selected section
+    if current_run >= montecarlo_section_runs * (montecarlo_section-1) and \
+    current_run < montecarlo_section_runs * montecarlo_section:
+    
         nodes_data = {
-        "buses": xls.parse("buses"),
+        "buses": buses_varied,
         "energysystem": xls.parse("energysystem"),
         "sinks": xls.parse("sinks"),
-        "links": xls.parse("links"),
-        "sources": a,
+        "links": links_varied,
+        "sources": sources_varied,
         "timeseries": xls.parse("time series", parse_dates=["timestamp"]),
-        "transformers": b,
-        "storages": c,
+        "transformers": transformers_varied,
+        "storages": storages_varied,
         "weather data": xls.parse("weather data", parse_dates=["timestamp"]),
         "competition constraints": xls.parse("competition constraints"),
-        "insulation": xls.parse("insulation"),
-        "district heating": xls.parse("district heating"),
+        "insulation": insulation_varied,
+        "district heating": district_heating,
         "pipe types": xls.parse("pipe types")
         }
+        
         if delete_units:
             # delete spreadsheet row within technology or units specific
             # parameters
@@ -191,37 +251,26 @@ def import_model_definition_montecarlo(durchlauf: int, montecarlo_section_runs: 
             lat = nodes_data["energysystem"].loc[1, "weather data lat"]
             lon = nodes_data["energysystem"].loc[1, "weather data lon"]
             nodes_data = import_open_fred_weather_data(nodes_data, lat, lon)
-        # returns nodes data
-        return nodes_data   
-            
+   
+        # save changed files as a separate sheet
+        path = result_path + "/montecarlo_used_parameters.xlsx"
+        writer = pandas.ExcelWriter(path, engine='xlsxwriter')
+        nodes_data['buses'].to_excel(writer, sheet_name='buses')
+        nodes_data['sources'].to_excel(writer, sheet_name='sources')
+        nodes_data['transformers'].to_excel(writer, sheet_name='transformers')
+        nodes_data['storages'].to_excel(writer, sheet_name='storages')
+        nodes_data['links'].to_excel(writer, sheet_name='links')
+        nodes_data['insulation'].to_excel(writer, sheet_name='insulation')
+        nodes_data['district heating'].to_excel(writer, sheet_name='district heating')
+        writer.close()
+   
     else:
         
-        
-        a = xls.parse("sources")
-        a_2 = xls.parse("sources")
-        
-
-
-        b = xls.parse("transformers")
-        b_2 = xls.parse("transformers")
-        for i, index in b["min. investment capacity"][1:].items():
-            index=rand.randint(0,b_2["max. investment capacity"][i])
-            b["min. investment capacity"][i]=index
-            b["max. investment capacity"][i]=b["min. investment capacity"][i]
-            logging.info("Transformers: " + str(index))
-        
-
-        c = xls.parse("storages")
-        c_2 = xls.parse("storages")
-        for i, index in c["min. investment capacity"][1:].items():
-            index=rand.randint(0,c_2["max. investment capacity"][i])
-            c["min. investment capacity"][i]=index
-            c["max. investment capacity"][i]=c["min. investment capacity"][i]
-            logging.info("... und Speicher: " + str(index))
-
-        
+        # skips not selected runs
         nodes_data={}
-        return nodes_data
+        
+    # returns nodes data
+    return nodes_data
 
 
 def define_energy_system(nodes_data: dict) -> EnergySystem:
